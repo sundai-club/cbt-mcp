@@ -6,10 +6,88 @@ Uses Cognitive Behavioral Therapy techniques to help AI agents recover from bein
 
 from typing import List, Dict, Any, Optional, Union
 import json
+import logging
+import os
+from pathlib import Path
+from datetime import datetime, timedelta
+from dataclasses import dataclass, field, asdict
+from enum import Enum
 from fastmcp import FastMCP
 
+# Load configuration
+CONFIG_PATH = Path(__file__).parent / "cbt_config.json"
+config = {}
+if CONFIG_PATH.exists():
+    with open(CONFIG_PATH, 'r') as f:
+        config = json.load(f)
+
+# Configure logging
+log_level = config.get('server', {}).get('log_level', 'INFO')
+logging.basicConfig(level=getattr(logging, log_level), 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # Initialize the FastMCP server
-mcp = FastMCP("cbt-agent-helper")
+server_name = config.get('server', {}).get('name', 'cbt-agent-helper')
+mcp = FastMCP(server_name)
+
+# Session management
+class SessionState(Enum):
+    INITIAL = "initial"
+    IN_PROGRESS = "in_progress"
+    IMPROVING = "improving"
+    RESOLVED = "resolved"
+    ESCALATED = "escalated"
+
+@dataclass
+class AgentSession:
+    session_id: str
+    start_time: datetime
+    state: SessionState = SessionState.INITIAL
+    primary_issue: str = ""
+    interventions_tried: List[str] = field(default_factory=list)
+    progress_indicators: List[str] = field(default_factory=list)
+    frustration_history: List[int] = field(default_factory=list)
+    context_history: List[Dict] = field(default_factory=list)
+    last_update: datetime = field(default_factory=datetime.now)
+    
+    def add_intervention(self, intervention: str):
+        self.interventions_tried.append(intervention)
+        self.last_update = datetime.now()
+    
+    def update_state(self, new_state: SessionState):
+        self.state = new_state
+        self.last_update = datetime.now()
+    
+    def add_progress(self, indicator: str):
+        self.progress_indicators.append(indicator)
+        self.last_update = datetime.now()
+    
+    def to_dict(self) -> Dict:
+        data = asdict(self)
+        data['state'] = self.state.value
+        data['start_time'] = self.start_time.isoformat()
+        data['last_update'] = self.last_update.isoformat()
+        return data
+
+# Global session storage (in production, use a proper database)
+SESSIONS: Dict[str, AgentSession] = {}
+
+# Enhanced validation
+class ValidationError(Exception):
+    pass
+
+def validate_frustration_level(level: int) -> int:
+    """Validate frustration level is within bounds"""
+    if not isinstance(level, int) or level < 1 or level > 10:
+        raise ValidationError(f"Frustration level must be an integer between 1 and 10, got {level}")
+    return level
+
+def validate_non_empty_string(value: str, field_name: str) -> str:
+    """Validate string is non-empty"""
+    if not value or not value.strip():
+        raise ValidationError(f"{field_name} cannot be empty")
+    return value.strip()
 
 # Core CBT strategies for AI agents
 CBT_STRATEGIES = {
@@ -62,23 +140,93 @@ CBT_STRATEGIES = {
             "Are you focused on past failures or future worries?",
             "What information do you have available?"
         ]
+    },
+    "socratic_questioning": {
+        "name": "Socratic Questioning",
+        "description": "Use guided questions to uncover assumptions and explore alternatives",
+        "prompts": [
+            "What makes you think that?",
+            "What assumptions are you making?",
+            "What if the opposite were true?",
+            "How do you know this for certain?",
+            "What alternative explanations exist?"
+        ]
+    },
+    "cost_benefit_analysis": {
+        "name": "Cost-Benefit Analysis",
+        "description": "Evaluate the pros and cons of different approaches",
+        "prompts": [
+            "What are the benefits of continuing this approach?",
+            "What are the costs (time, resources, complexity)?",
+            "Is there a simpler solution with acceptable trade-offs?",
+            "What's the opportunity cost of persisting?"
+        ]
+    },
+    "graded_exposure": {
+        "name": "Graded Exposure",
+        "description": "Break overwhelming tasks into graduated steps",
+        "prompts": [
+            "What's the absolute smallest step you can take?",
+            "Can you test with a toy example first?",
+            "What would 10% progress look like?",
+            "How can you make this less intimidating?"
+        ]
+    },
+    "acceptance_commitment": {
+        "name": "Acceptance and Commitment",
+        "description": "Accept current limitations while committing to values-based action",
+        "prompts": [
+            "What constraints must you accept?",
+            "What's within your control to change?",
+            "What matters most in this situation?",
+            "How can you work with, not against, the limitations?"
+        ]
     }
 }
 
-# Emotional states that agents might experience
+# Enhanced emotional states with severity levels
 AGENT_STATES = {
     "stuck": "Unable to proceed with task",
     "overwhelmed": "Too many options or complexity",
     "confused": "Unclear about requirements or next steps",
     "error_loop": "Repeatedly encountering the same error",
     "indecisive": "Unable to choose between options",
-    "catastrophizing": "Overestimating negative consequences"
+    "catastrophizing": "Overestimating negative consequences",
+    "blocked": "Unable to make any progress due to external constraints",
+    "looping": "Repeating the same actions without different results",
+    "fragmented": "Jumping between tasks without completing any",
+    "perfectionist": "Unable to proceed due to unrealistic standards",
+    "analysis_paralysis": "Over-analyzing without taking action"
 }
 
+
+def get_session(session_id: str) -> Optional[AgentSession]:
+    """Get or create a session"""
+    if session_id not in SESSIONS:
+        SESSIONS[session_id] = AgentSession(
+            session_id=session_id,
+            start_time=datetime.now()
+        )
+    return SESSIONS.get(session_id)
+
+def clean_old_sessions(hours: int = 24):
+    """Clean up sessions older than specified hours"""
+    cutoff = datetime.now() - timedelta(hours=hours)
+    old_sessions = [sid for sid, session in SESSIONS.items() 
+                   if session.last_update < cutoff]
+    for sid in old_sessions:
+        del SESSIONS[sid]
+    if old_sessions:
+        logger.info(f"Cleaned {len(old_sessions)} old sessions")
 
 def get_state_signs(state: str) -> List[str]:
     """Get signs associated with a particular agent state"""
     signs = {
+        "blocked": ["External dependency issues", "Waiting for resources", "Permission denied errors"],
+        "looping": ["Repeated error messages", "Same action multiple times", "No variation in approach"],
+        "fragmented": ["Multiple incomplete tasks", "Context switching frequently", "No clear focus"],
+        "perfectionist": ["Excessive refactoring", "Never satisfied with solution", "Endless optimization"],
+        "analysis_paralysis": ["Excessive planning without action", "Endless research", "Unable to decide"],
         "stuck": ["Repeating same action", "No progress for extended time", "Circular reasoning"],
         "overwhelmed": ["Trying to do everything at once", "Unable to prioritize", "Information overload"],
         "confused": ["Contradictory actions", "Asking same questions repeatedly", "Misunderstanding requirements"],
@@ -92,6 +240,11 @@ def get_state_signs(state: str) -> List[str]:
 def get_state_interventions(state: str) -> List[str]:
     """Get interventions for a particular agent state"""
     interventions = {
+        "blocked": ["Document the blocker clearly", "Find workaround", "Escalate if needed"],
+        "looping": ["Stop and analyze the pattern", "Try opposite approach", "Simplify the problem"],
+        "fragmented": ["Choose one task to complete", "Write down all tasks", "Set clear priorities"],
+        "perfectionist": ["Define 'good enough'", "Set time limit", "Ship then iterate"],
+        "analysis_paralysis": ["Set decision deadline", "Choose and commit", "Accept imperfection"],
         "stuck": ["Break problem into smallest parts", "Try opposite approach", "Seek different perspective"],
         "overwhelmed": ["List top 3 priorities", "Focus on one thing", "Take systematic break"],
         "confused": ["Clarify requirements", "List what you know", "Ask specific questions"],
@@ -101,6 +254,55 @@ def get_state_interventions(state: str) -> List[str]:
     }
     return interventions.get(state, [])
 
+
+@mcp.tool()
+def start_session(
+    session_id: str,
+    initial_problem: str
+) -> Dict[str, Any]:
+    """
+    Start a new CBT session for an agent
+    
+    Args:
+        session_id: Unique identifier for this session
+        initial_problem: Description of the initial problem
+    
+    Returns:
+        Session initialization with welcome and assessment
+    """
+    try:
+        session_id = validate_non_empty_string(session_id, "session_id")
+        initial_problem = validate_non_empty_string(initial_problem, "initial_problem")
+        
+        session = get_session(session_id)
+        session.primary_issue = initial_problem
+        session.update_state(SessionState.IN_PROGRESS)
+        
+        return {
+            "session_id": session_id,
+            "status": "session_started",
+            "initial_assessment": {
+                "problem_statement": initial_problem,
+                "suggested_first_step": "Let's understand what's happening",
+                "questions": [
+                    "When did this issue first appear?",
+                    "What have you tried so far?",
+                    "What's your ideal outcome?"
+                ]
+            },
+            "available_tools": [
+                "analyze_stuck_pattern",
+                "reframe_thought",
+                "create_action_plan",
+                "regulate_frustration"
+            ]
+        }
+    except ValidationError as e:
+        logger.error(f"Validation error in start_session: {e}")
+        return {"error": str(e), "status": "failed"}
+    except Exception as e:
+        logger.error(f"Unexpected error in start_session: {e}")
+        return {"error": "An unexpected error occurred", "status": "failed"}
 
 @mcp.tool()
 def analyze_stuck_pattern(
@@ -530,6 +732,12 @@ def get_agent_state_patterns() -> Dict[str, Any]:
                 "interventions": get_state_interventions(key)
             }
             for key, value in AGENT_STATES.items()
+        ],
+        "severity_levels": [
+            {"level": "mild", "description": "Minor friction, easily addressed"},
+            {"level": "moderate", "description": "Noticeable impact, requires intervention"},
+            {"level": "severe", "description": "Significant blockage, needs immediate help"},
+            {"level": "critical", "description": "Complete halt, escalation needed"}
         ]
     }
 

@@ -1,0 +1,67 @@
+{
+  "server": {
+    "name": "cbt-agent-helper",
+    "version": "2.0.0",
+    "description": "Enhanced CBT-based mental health support for AI agents",
+    "log_level": "INFO"
+  },
+  "session": {
+    "max_duration_hours": 24,
+    "cleanup_interval_hours": 12,
+    "max_sessions": 100,
+    "auto_escalate_threshold": 3
+  },
+  "interventions": {
+    "frustration": {
+      "high_threshold": 7,
+      "critical_threshold": 9,
+      "cooldown_minutes": 5
+    },
+    "stuck_detection": {
+      "time_threshold_minutes": 30,
+      "attempt_threshold": 5,
+      "auto_suggest_break": true
+    },
+    "wellness": {
+      "check_interval_minutes": 15,
+      "low_score_threshold": 40,
+      "critical_score_threshold": 20
+    }
+  },
+  "strategies": {
+    "preferred_order": [
+      "mindfulness",
+      "cognitive_reframing",
+      "problem_solving",
+      "behavioral_activation",
+      "socratic_questioning"
+    ],
+    "enable_advanced": true,
+    "include_emojis": true
+  },
+  "prompts": {
+    "personalization": {
+      "tone": "supportive",
+      "verbosity": "balanced",
+      "include_examples": true
+    },
+    "emergency": {
+      "enable_quick_protocol": true,
+      "auto_detect_crisis": true,
+      "escalation_contact": null
+    }
+  },
+  "features": {
+    "session_management": true,
+    "frustration_tracking": true,
+    "progress_indicators": true,
+    "cognitive_distortion_detection": true,
+    "pattern_learning": false,
+    "multi_agent_support": false
+  },
+  "experimental": {
+    "ai_personality_adaptation": false,
+    "mood_prediction": false,
+    "collaborative_problem_solving": false
+  }
+}
