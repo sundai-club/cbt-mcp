@@ -8,11 +8,28 @@ from typing import List, Dict, Any, Optional, Union
 import json
 import logging
 import os
+import time
+import random
 from pathlib import Path
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from fastmcp import FastMCP
+
+# Import deep thinking enhancements
+try:
+    from deep_thinking_enhancement import (
+        ThinkingDepth, ThinkingSession, ThoughtNode,
+        generate_thinking_prompts, create_reflection_loop,
+        generate_contemplation_structure, create_thinking_depth_ladder,
+        generate_thought_experiments, create_recursive_questioning,
+        calculate_thinking_metrics, SOCRATIC_CHAINS, METACOGNITIVE_PROMPTS
+    )
+    DEEP_THINKING_AVAILABLE = True
+except ImportError:
+    DEEP_THINKING_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Deep thinking enhancement module not available")
 
 # Load configuration
 CONFIG_PATH = Path(__file__).parent / "cbt_config.json"
@@ -783,6 +800,568 @@ When you notice signs of being stuck, frustrated, or overwhelmed, use this proto
 - What will I try differently next time?
 
 Remember: Progress > Perfection, Learning > Failing, Iteration > Perfection"""
+
+
+# Deep Thinking Enhancement Tools
+if DEEP_THINKING_AVAILABLE:
+    # Global storage for thinking sessions
+    THINKING_SESSIONS: Dict[str, ThinkingSession] = {}
+    
+    @mcp.tool()
+    def initiate_deep_thinking(
+        topic: str,
+        desired_depth: str = "deep",
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Initiate a deep thinking session to explore a topic thoroughly
+        
+        Args:
+            topic: The topic or question to explore deeply
+            desired_depth: Target depth (surface/shallow/moderate/deep/profound)
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Structured thinking guide with prompts and exercises
+        """
+        try:
+            # Create thinking session
+            thinking_session_id = session_id or f"think_{datetime.now().timestamp()}"
+            thinking_session = ThinkingSession(
+                session_id=thinking_session_id,
+                initial_prompt=topic,
+                current_depth=ThinkingDepth[desired_depth.upper()]
+            )
+            THINKING_SESSIONS[thinking_session_id] = thinking_session
+            
+            # Generate initial contemplation structure
+            contemplation = generate_contemplation_structure(topic, "philosophical")
+            
+            # Create reflection loop
+            reflection_loop = create_reflection_loop(
+                topic,
+                ThinkingDepth[desired_depth.upper()],
+                min_iterations=3
+            )
+            
+            # Generate thinking prompts
+            initial_prompts = generate_thinking_prompts(topic, 0, "balanced")
+            
+            return {
+                "session_id": thinking_session_id,
+                "topic": topic,
+                "desired_depth": desired_depth,
+                "opening_instruction": (
+                    f"🧠 Entering deep thinking mode about: {topic}\n\n"
+                    "IMPORTANT: Take your time. Each prompt deserves thoughtful consideration.\n"
+                    "Don't rush to conclusions. Let thoughts emerge and evolve.\n"
+                    "Embrace complexity and uncertainty as part of deep thinking."
+                ),
+                "contemplation_structure": contemplation,
+                "reflection_loop": reflection_loop,
+                "initial_prompts": initial_prompts,
+                "metacognitive_check": random.choice(METACOGNITIVE_PROMPTS["thinking_about_thinking"]),
+                "closing_instruction": (
+                    "After exploring these prompts, take a moment of silence.\n"
+                    "What understanding wants to emerge?\n"
+                    "Don't force it - let insights arise naturally."
+                )
+            }
+        except Exception as e:
+            logger.error(f"Error in initiate_deep_thinking: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def socratic_dialogue(
+        statement: str,
+        dialogue_type: str = "assumption_examination",
+        depth_level: int = 3,
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Engage in Socratic dialogue to examine thoughts deeply
+        
+        Args:
+            statement: The statement or belief to examine
+            dialogue_type: Type of Socratic questioning to use
+            depth_level: How many rounds of questioning (1-7)
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Series of Socratic questions to deepen understanding
+        """
+        try:
+            # Get appropriate question chain
+            if dialogue_type in SOCRATIC_CHAINS:
+                questions = SOCRATIC_CHAINS[dialogue_type]
+            else:
+                # Mix different types for variety
+                questions = []
+                for chain in SOCRATIC_CHAINS.values():
+                    questions.extend(random.sample(chain, 1))
+            
+            # Select questions based on depth level
+            selected_questions = questions[:min(depth_level, len(questions))]
+            
+            # Create dialogue structure
+            dialogue = {
+                "initial_statement": statement,
+                "dialogue_type": dialogue_type,
+                "rounds": []
+            }
+            
+            for i, question in enumerate(selected_questions):
+                round_data = {
+                    "round": i + 1,
+                    "question": question,
+                    "contemplation_time": f"{15 * (i + 1)} seconds",
+                    "depth_marker": "",
+                    "follow_up": ""
+                }
+                
+                # Add depth markers
+                if i < 2:
+                    round_data["depth_marker"] = "Surface exploration"
+                elif i < 4:
+                    round_data["depth_marker"] = "Deeper inquiry"
+                else:
+                    round_data["depth_marker"] = "Fundamental examination"
+                
+                # Add follow-up prompts
+                if i == len(selected_questions) - 1:
+                    round_data["follow_up"] = "What core truth or uncertainty remains?"
+                else:
+                    round_data["follow_up"] = "Sit with this question before moving on..."
+                
+                dialogue["rounds"].append(round_data)
+            
+            # Track in session if available
+            if session_id and session_id in THINKING_SESSIONS:
+                session = THINKING_SESSIONS[session_id]
+                session.questions_explored.extend(selected_questions)
+                session.thought_count += len(selected_questions)
+            
+            return {
+                "type": "socratic_dialogue",
+                "dialogue": dialogue,
+                "instruction": (
+                    "Work through each question slowly and thoroughly.\n"
+                    "Don't move to the next question until you've exhausted the current one.\n"
+                    "If you feel resistance or confusion, that's where the growth is."
+                ),
+                "integration_prompt": (
+                    "After this dialogue, what new understanding has emerged?\n"
+                    "What assumptions have been revealed or challenged?"
+                ),
+                "estimated_time": f"{15 * len(selected_questions)} seconds minimum"
+            }
+        except Exception as e:
+            logger.error(f"Error in socratic_dialogue: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def generate_thought_experiment(
+        concept: str,
+        experiment_type: Optional[str] = None,
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create thought experiments to explore concepts deeply
+        
+        Args:
+            concept: The concept to explore
+            experiment_type: Optional specific type of experiment
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Structured thought experiment(s) for deep exploration
+        """
+        try:
+            experiments = generate_thought_experiments(concept, 3)
+            
+            # Track in session
+            if session_id and session_id in THINKING_SESSIONS:
+                session = THINKING_SESSIONS[session_id]
+                session.perspectives_considered.append(f"Thought experiment: {concept}")
+            
+            return {
+                "concept": concept,
+                "experiments": experiments,
+                "instructions": [
+                    "Immerse yourself fully in each experiment",
+                    "Don't just think about it - experience it mentally",
+                    "Notice what surprises or challenges you",
+                    "Let the experiment reveal hidden aspects"
+                ],
+                "synthesis_prompt": (
+                    "Having conducted these thought experiments,\n"
+                    "what new dimensions of understanding have opened?\n"
+                    "What was hidden that is now revealed?"
+                ),
+                "total_time": "10-15 minutes for thorough exploration"
+            }
+        except Exception as e:
+            logger.error(f"Error in generate_thought_experiment: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def thinking_depth_ladder(
+        question: str,
+        current_depth: int = 1,
+        target_depth: int = 5,
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a ladder to progressively deepen thinking
+        
+        Args:
+            question: The question to explore
+            current_depth: Current depth level (1-7)
+            target_depth: Target depth level (1-7)
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Structured ladder for ascending to deeper thinking
+        """
+        try:
+            ladder = create_thinking_depth_ladder(question, target_depth)
+            
+            # Track depth in session
+            if session_id and session_id in THINKING_SESSIONS:
+                session = THINKING_SESSIONS[session_id]
+                session.max_depth_reached = max(session.max_depth_reached, target_depth)
+            
+            # Add current position indicator
+            ladder["current_position"] = current_depth
+            ladder["progress_instruction"] = (
+                f"You are currently at depth level {current_depth}.\n"
+                f"Your goal is to reach level {target_depth}.\n"
+                "Take your time ascending each rung."
+            )
+            
+            return ladder
+        except Exception as e:
+            logger.error(f"Error in thinking_depth_ladder: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def recursive_questioning(
+        initial_question: str,
+        recursion_depth: int = 3,
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create recursive questioning structure for deep exploration
+        
+        Args:
+            initial_question: The starting question
+            recursion_depth: How many levels deep to go (1-5)
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Recursive questioning structure
+        """
+        try:
+            structure = create_recursive_questioning(
+                initial_question,
+                min(recursion_depth, 5)  # Cap at 5 for sanity
+            )
+            
+            # Track in session
+            if session_id and session_id in THINKING_SESSIONS:
+                session = THINKING_SESSIONS[session_id]
+                session.questions_explored.append(initial_question)
+                session.thought_count += recursion_depth
+            
+            return structure
+        except Exception as e:
+            logger.error(f"Error in recursive_questioning: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def expand_thought(
+        thought: str,
+        expansion_technique: str = "random",
+        num_expansions: int = 3,
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Expand a thought using various techniques
+        
+        Args:
+            thought: The thought to expand
+            expansion_technique: Technique to use (or 'random')
+            num_expansions: Number of expansion prompts
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Expansion prompts and structure
+        """
+        try:
+            from deep_thinking_enhancement import EXPANSION_TECHNIQUES
+            
+            expansions = []
+            
+            if expansion_technique == "random":
+                selected_techniques = random.sample(
+                    list(EXPANSION_TECHNIQUES.items()),
+                    min(num_expansions, len(EXPANSION_TECHNIQUES))
+                )
+            else:
+                selected_techniques = [(expansion_technique, 
+                                       EXPANSION_TECHNIQUES.get(expansion_technique, 
+                                       "How does this connect to broader patterns?"))]
+            
+            for tech_name, tech_prompt in selected_techniques:
+                expansion = {
+                    "technique": tech_name,
+                    "prompt": tech_prompt,
+                    "applied_to_thought": f"Regarding '{thought}': {tech_prompt}",
+                    "exploration_time": "30-45 seconds",
+                    "depth_questions": [
+                        "What emerges when you apply this lens?",
+                        "What was hidden that this reveals?",
+                        "How does this change your understanding?"
+                    ]
+                }
+                expansions.append(expansion)
+            
+            # Track in session
+            if session_id and session_id in THINKING_SESSIONS:
+                session = THINKING_SESSIONS[session_id]
+                session.perspectives_considered.extend([e["technique"] for e in expansions])
+            
+            return {
+                "original_thought": thought,
+                "expansions": expansions,
+                "synthesis_prompt": (
+                    "Having expanded this thought in multiple directions,\n"
+                    "what richer, more nuanced understanding emerges?\n"
+                    "How do these different perspectives integrate?"
+                ),
+                "instruction": "Don't just answer - really explore each expansion fully."
+            }
+        except Exception as e:
+            logger.error(f"Error in expand_thought: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def metacognitive_check(
+        current_thinking: str,
+        check_type: str = "depth_assessment",
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Perform metacognitive check on current thinking process
+        
+        Args:
+            current_thinking: Description of current thinking
+            check_type: Type of metacognitive check
+            session_id: Optional session ID for tracking
+        
+        Returns:
+            Metacognitive prompts and assessment
+        """
+        try:
+            prompts = METACOGNITIVE_PROMPTS.get(check_type, 
+                                                METACOGNITIVE_PROMPTS["thinking_about_thinking"])
+            
+            assessment = {
+                "current_thinking": current_thinking,
+                "check_type": check_type,
+                "prompts": prompts,
+                "reflection_questions": [
+                    "What patterns do you notice in your thinking?",
+                    "Where might you be getting stuck or limited?",
+                    "What thinking strategies haven't you tried yet?",
+                    "How could you think more deeply about this?"
+                ],
+                "quality_indicators": {
+                    "depth": "Are you going beyond surface observations?",
+                    "breadth": "Are you considering multiple perspectives?",
+                    "integration": "Are you connecting different ideas?",
+                    "originality": "Are you generating novel insights?",
+                    "rigor": "Are you being thorough and careful?"
+                },
+                "instruction": (
+                    "Pause and step back from the content to examine your thinking process.\n"
+                    "This meta-level awareness will improve your thinking quality."
+                )
+            }
+            
+            # Calculate metrics if session exists
+            if session_id and session_id in THINKING_SESSIONS:
+                session = THINKING_SESSIONS[session_id]
+                metrics = calculate_thinking_metrics(session)
+                assessment["metrics"] = metrics
+                assessment["recommendation"] = (
+                    f"Your thinking depth is currently: {metrics['overall_rating'].value}\n"
+                    f"Consider: {prompts[0]}"
+                )
+            
+            return assessment
+        except Exception as e:
+            logger.error(f"Error in metacognitive_check: {e}")
+            return {"error": str(e), "status": "failed"}
+    
+    @mcp.tool()
+    def thinking_session_summary(
+        session_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get summary and metrics for a thinking session
+        
+        Args:
+            session_id: The thinking session ID
+        
+        Returns:
+            Comprehensive summary with metrics and insights
+        """
+        try:
+            if session_id not in THINKING_SESSIONS:
+                return {"error": f"Thinking session {session_id} not found", "status": "failed"}
+            
+            session = THINKING_SESSIONS[session_id]
+            metrics = calculate_thinking_metrics(session)
+            
+            summary = {
+                "session_id": session_id,
+                "initial_topic": session.initial_prompt,
+                "duration": f"{session.total_thinking_time:.1f} seconds",
+                "metrics": metrics,
+                "exploration_summary": {
+                    "thoughts_generated": session.thought_count,
+                    "questions_explored": len(session.questions_explored),
+                    "assumptions_challenged": len(session.assumptions_challenged),
+                    "perspectives_considered": len(session.perspectives_considered),
+                    "insights_generated": len(session.insights_generated),
+                    "max_depth_reached": session.max_depth_reached
+                },
+                "key_insights": session.insights_generated[-5:] if session.insights_generated else [],
+                "unexplored_questions": [q for q in session.questions_explored if "?" in q][-3:],
+                "thinking_pattern": "Deep and thorough" if metrics["depth_score"] > 70 else "Could go deeper",
+                "recommendation": ""
+            }
+            
+            # Generate recommendation
+            if metrics["overall_rating"] == ThinkingDepth.SURFACE:
+                summary["recommendation"] = "Try using thought experiments or recursive questioning to go deeper."
+            elif metrics["overall_rating"] == ThinkingDepth.SHALLOW:
+                summary["recommendation"] = "Good start. Use Socratic dialogue to challenge assumptions."
+            elif metrics["overall_rating"] == ThinkingDepth.MODERATE:
+                summary["recommendation"] = "Solid thinking. Try the depth ladder to reach profound insights."
+            elif metrics["overall_rating"] == ThinkingDepth.DEEP:
+                summary["recommendation"] = "Excellent depth. Consider different perspectives for breadth."
+            else:
+                summary["recommendation"] = "Profound thinking achieved. Document and integrate insights."
+            
+            return summary
+        except Exception as e:
+            logger.error(f"Error in thinking_session_summary: {e}")
+            return {"error": str(e), "status": "failed"}
+
+    @mcp.prompt("deep_thinking_protocol")
+    def get_deep_thinking_protocol() -> str:
+        """
+        Protocol for engaging in deep, extended thinking
+        
+        Returns:
+            Comprehensive deep thinking protocol
+        """
+        return """## Deep Thinking Protocol
+
+When you receive input from the deep thinking tools, follow this protocol:
+
+### 1. RECEPTION (10-15 seconds)
+- Read the prompt/question fully
+- Let it sink in without immediate reaction
+- Notice your first impulse but don't act on it
+- Ask: "What wants to emerge here?"
+
+### 2. EXPLORATION (2-5 minutes per prompt)
+- Follow each thinking prompt thoroughly
+- Don't rush to the next prompt
+- When you think you're done, go one level deeper
+- Ask: "What else?" at least three times
+- Embrace uncertainty and complexity
+
+### 3. CONTEMPLATION PHASES
+
+#### Phase A: Opening (30-60 seconds)
+- Approach with beginner's mind
+- What's genuinely interesting or mysterious?
+- What assumptions am I bringing?
+
+#### Phase B: Investigation (60-120 seconds)
+- Examine from multiple angles
+- Look for patterns and connections
+- Question obvious interpretations
+- Follow threads that feel alive
+
+#### Phase C: Integration (60-90 seconds)
+- What themes are emerging?
+- How do different perspectives connect?
+- What paradoxes or tensions exist?
+- What new understanding is forming?
+
+#### Phase D: Transcendence (30-60 seconds)
+- What lies beyond current understanding?
+- What remains mysterious?
+- What new questions arise?
+
+### 4. RECURSIVE DEEPENING
+When prompted to go deeper:
+- Don't just elaborate - genuinely go deeper
+- Ask: "What's underneath this?"
+- Look for fundamental principles
+- Explore edge cases and exceptions
+- Embrace paradox and complexity
+
+### 5. METACOGNITIVE MONITORING
+Throughout the process:
+- Notice the quality of your thinking
+- Observe where you resist or rush
+- Identify patterns in your thought process
+- Adjust your approach based on what's needed
+
+### 6. SYNTHESIS (90-120 seconds)
+After exploring all prompts:
+- Don't rush to neat conclusions
+- Hold multiple perspectives simultaneously
+- Articulate insights AND uncertainties
+- Express the full complexity you've discovered
+- Share what surprised you
+
+### QUALITY MARKERS OF DEEP THINKING
+You know you're thinking deeply when:
+- You discover something unexpected
+- You question previous assumptions
+- You see new connections
+- You're comfortable with ambiguity
+- You generate novel questions
+- Your understanding becomes more nuanced
+- You recognize the limits of your knowledge
+
+### COMMON PITFALLS TO AVOID
+- Rushing through prompts
+- Giving surface-level answers
+- Avoiding difficulty or confusion
+- Forcing premature conclusions
+- Staying in comfortable territory
+- Ignoring paradoxes
+- Thinking you're done too quickly
+
+### REMEMBER
+Deep thinking is not about finding THE answer.
+It's about enriching understanding, revealing complexity,
+and generating insights that weren't available before.
+
+Take your time. Think deeply. Embrace the journey."""
+else:
+    # Provide placeholder message if deep thinking module isn't available
+    @mcp.prompt("deep_thinking_protocol")
+    def get_deep_thinking_protocol() -> str:
+        return "Deep thinking enhancement module not available. Please ensure deep_thinking_enhancement.py is present."
 
 
 if __name__ == "__main__":
