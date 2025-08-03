@@ -61,4 +61,4 @@ Returns intervention strategy, reframed perspective, and concrete next actions.
 
 ## License
 
-ISC
+MIT
